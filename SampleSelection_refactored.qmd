@@ -1,0 +1,135 @@
+---
+title: "Sample Selection"
+format: html
+editor: visual
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+source("sample_selection_core.R")
+```
+
+# Sampling Frame Construction
+
+The sampling frame was built from 2020 Census tract and block-group files for Detroit, Michigan. Census tracts are the primary sampling units (PSUs), block groups are the secondary sampling units (SSUs), and persons are the ultimate elements.
+
+```{r}
+tibble(
+  n_tracts_raw = n_distinct(tract$Tract),
+  n_tracts_frame = nrow(tract_frame),
+  n_bgs_frame = nrow(bg_frame)
+)
+```
+
+## Tract Flags and Screening Rules
+
+```{r}
+tract %>%
+  summarise(
+    zero_adult_population = sum(zero_pop_flag, na.rm = TRUE),
+    fewer_than_two_bgs = sum(lt2_bg_flag, na.rm = TRUE),
+    small_adult_population = sum(small_age18p_flag, na.rm = TRUE)
+  )
+```
+
+# Respondent Targets and Equal-Rate Check
+
+```{r}
+resp_targets
+```
+
+```{r}
+same_rate_check
+```
+
+# Measure of Size
+
+A response-rate-adjusted measure of size was used:
+
+$$
+MOS_i = \frac{N_{i,18-34}}{0.35} + \frac{N_{i,35-49}}{0.45} + \frac{N_{i,50-64}}{0.50} + \frac{N_{i,65+}}{0.65}
+$$
+
+```{r}
+tract_frame %>%
+  summarise(
+    min_MOS = min(MOS, na.rm = TRUE),
+    q1_MOS = quantile(MOS, 0.25, na.rm = TRUE),
+    median_MOS = median(MOS, na.rm = TRUE),
+    mean_MOS = mean(MOS, na.rm = TRUE),
+    q3_MOS = quantile(MOS, 0.75, na.rm = TRUE),
+    max_MOS = max(MOS, na.rm = TRUE)
+  )
+```
+
+# PSU and SSU Selection
+
+## Selected Tracts
+
+```{r}
+tract_sample %>%
+  select(Tract, NAME, n_bg, age18p, MOS, pik1, psu_weight)
+```
+
+## Selected Block Groups
+
+```{r}
+bg_sample %>%
+  select(Tract, BlockGroup, NAME, age18p, MOS, pik2, ssu_weight)
+```
+
+# Person-Level Allocation
+
+```{r}
+bg_sample %>%
+  select(
+    Tract, BlockGroup,
+    age18_34, age35_49, age50_64, age65p,
+    n18_34, n35_49, n50_64, n65p,
+    f18_34, f35_49, f50_64, f65p
+  )
+```
+
+```{r}
+bg_sample %>%
+  summarise(
+    total_n18_34 = sum(n18_34, na.rm = TRUE),
+    total_n35_49 = sum(n35_49, na.rm = TRUE),
+    total_n50_64 = sum(n50_64, na.rm = TRUE),
+    total_n65p = sum(n65p, na.rm = TRUE),
+    avg_workload = mean(n18_34 + n35_49 + n50_64 + n65p, na.rm = TRUE),
+    min_workload = min(n18_34 + n35_49 + n50_64 + n65p, na.rm = TRUE),
+    max_workload = max(n18_34 + n35_49 + n50_64 + n65p, na.rm = TRUE)
+  )
+```
+
+# Weights
+
+```{r}
+cv_weights
+```
+
+# Exported Files
+
+Running `sample_selection_core.R` writes these CSV files:
+
+-   `frame_tract_out_CV.csv`
+-   `frame_bg_out_CV.csv`
+-   `sample_out_CV.csv`
+-   `frame_codebook_CV.csv`
+-   `sample_codebook_CV.csv`
+
+# Codebook: Frame Files
+
+```{r}
+frame_codebook
+```
+
+# Codebook: Sample File
+
+```{r}
+sample_codebook
+```

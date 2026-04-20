@@ -1,0 +1,121 @@
+---
+title: "SURV 745 Sampling Report"
+format: pdf
+editor: visual
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+source("sample_selection_core.R")
+```
+
+# Target Population and Objectives
+
+The target population consists of all persons aged 18 and older residing in Detroit, Michigan. The design objective is to obtain 1,000 completed interviews, with 250 respondents in each of four age domains: 18--34, 35--49, 50--64, and 65+.
+
+Expected response rates vary by age group. Therefore, the selected sample sizes must exceed the final respondent targets.
+
+## Required Respondent Targets
+
+```{r}
+resp_targets
+```
+
+# Sampling Frame Construction
+
+The sampling frame uses Census tracts as PSUs, block groups as SSUs, and persons as the ultimate elements. Tracts with zero adult population were removed, and block groups were restricted to tracts in the analytic frame.
+
+## Analytic Frame Size
+
+```{r}
+tibble(
+  n_tracts = nrow(tract_frame),
+  n_block_groups = nrow(bg_frame)
+)
+```
+
+# Equal-Probability Design Diagnostic
+
+The implied equal-probability sampling rates by age group are shown below.
+
+```{r}
+same_rate_check
+```
+
+Although the implied sampling rates are close, they are not identical. This indicates that a strictly equal-probability design would not exactly achieve the target respondent counts. A response-rate-adjusted measure of size was therefore used to improve domain control while preserving approximate self-weighting within age groups.
+
+# Measure of Size
+
+The response-rate-adjusted measure of size is:
+
+$$
+MOS_i = \frac{N_{i,18-34}}{0.35} + \frac{N_{i,35-49}}{0.45} + \frac{N_{i,50-64}}{0.50} + \frac{N_{i,65+}}{0.65}
+$$
+
+This gives greater selection weight to areas with more persons in lower-response domains.
+
+# Sample Selection
+
+## Stage 1: Selection of PSUs
+
+A total of 40 census tracts were selected using PPS systematic sampling.
+
+```{r}
+tract_sample %>%
+  select(Tract, NAME, n_bg, age18p, MOS, pik1, psu_weight)
+```
+
+## Stage 2: Selection of SSUs
+
+One block group was selected within each sampled tract using PPS systematic sampling. Tracts with only one block group contributed a certainty-selected block group.
+
+```{r}
+bg_sample %>%
+  select(Tract, BlockGroup, NAME, age18p, MOS, pik2, ssu_weight)
+```
+
+## Stage 3: Person-Level Allocation
+
+Within each sampled block group, persons were allocated separately by age group to match the required selected sample sizes implied by the response rates.
+
+```{r}
+bg_sample %>%
+  summarise(
+    total_n18_34 = sum(n18_34, na.rm = TRUE),
+    total_n35_49 = sum(n35_49, na.rm = TRUE),
+    total_n50_64 = sum(n50_64, na.rm = TRUE),
+    total_n65p = sum(n65p, na.rm = TRUE),
+    avg_workload = mean(n18_34 + n35_49 + n50_64 + n65p, na.rm = TRUE),
+    min_workload = min(n18_34 + n35_49 + n50_64 + n65p, na.rm = TRUE),
+    max_workload = max(n18_34 + n35_49 + n50_64 + n65p, na.rm = TRUE)
+  )
+```
+
+# Weighting Summary
+
+The overall inclusion probability for a person in a given age group is the product of the tract inclusion probability, the block-group inclusion probability, and the within-block-group sampling rate.
+
+```{r}
+cv_weights
+```
+
+The coefficient of variation of the base weights indicates moderate within-domain weight dispersion, which is typical in a multistage PPS design with domain-controlled allocation.
+
+# Codebook: Frame Files
+
+```{r}
+frame_codebook
+```
+
+# Codebook: Sample File
+
+```{r}
+sample_codebook
+```
+
+# AI Disclosure
+
+Generative AI tools were used to assist with code refactoring, debugging, formatting, and drafting support. All substantive methodological decisions, implementation choices, and final interpretations were completed independently by the author, and all outputs were reviewed and validated prior to submission.
